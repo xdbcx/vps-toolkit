@@ -1,37 +1,39 @@
 #!/bin/bash
 set -e
+APP="/opt/vps-toolkit"
+BACKUP="/root/vps-toolkit-backup"
+BRANCH="main"
 
-APP=/opt/vps-toolkit
-BACKUP=/root/vps-toolkit-backup
-REPO=https://raw.githubusercontent.com/xdbcx/vps-toolkit/main
+[ "$(id -u)" = "0" ] || { echo "Please run as root"; exit 1; }
+[ -d "$APP/.git" ] || { echo "Not a git install, please reinstall."; exit 1; }
 
-mkdir -p $BACKUP
+mkdir -p "$BACKUP"
+cd "$APP"
 
-tar czf $BACKUP/backup-$(date +%F-%H%M).tar.gz $APP 2>/dev/null || true
-
-CURRENT=$(cat $APP/version)
-LATEST=$(curl -fsSL $REPO/version)
+CURRENT=$(cat version 2>/dev/null || echo unknown)
+git fetch origin "$BRANCH" -q
+LATEST=$(git show "origin/$BRANCH:version" 2>/dev/null || echo unknown)
 
 echo "Current: $CURRENT"
 echo "Latest : $LATEST"
 
-if [ "$CURRENT" = "$LATEST" ]; then
- echo "Already latest"
- exit 0
-fi
+[ "$CURRENT" = "$LATEST" ] && { echo "Already latest"; exit 0; }
 
-echo "Updating..."
+tar czf "$BACKUP/toolkit-before-update-$(date +%F-%H%M%S).tar.gz" "$APP" 2>/dev/null || true
 
-cd /tmp
-rm -rf vps-toolkit-update
-git clone -q $REPO vps-toolkit-update 2>/dev/null || true
+TMP_CFG="/tmp/vps-toolkit-config-$(date +%s)"
+mkdir -p "$TMP_CFG"
+[ -d "$APP/config" ] && cp -a "$APP/config/." "$TMP_CFG/" || true
 
-if [ -d /tmp/vps-toolkit-update ]; then
- cp -rf /tmp/vps-toolkit-update/modules $APP/
- cp -f /tmp/vps-toolkit-update/version $APP/
- cp -f /tmp/vps-toolkit-update/*.sh $APP/
-fi
+git reset --hard "origin/$BRANCH" -q
 
-chmod +x $APP/*.sh
+mkdir -p "$APP/config"
+cp -a "$TMP_CFG/." "$APP/config/" 2>/dev/null || true
+rm -rf "$TMP_CFG"
 
-echo "Update completed"
+find "$APP" -name "*.sh" -exec chmod +x {} \;
+ln -sf "$APP/vps.sh" /usr/local/bin/vt
+ln -sf "$APP/vps.sh" /usr/local/bin/vps-toolkit
+
+echo "Update complete:"
+cat "$APP/version"
