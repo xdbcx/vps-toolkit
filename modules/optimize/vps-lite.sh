@@ -1,4 +1,8 @@
 #!/bin/bash
+
+bash /opt/vps-toolkit/modules/optimize/foxbary-check.sh
+
+#!/bin/bash
 set -e
 echo "===== VPS Lite Optimize ====="
 [ "$(id -u)" = "0" ] || { echo "Please run as root"; exit 1; }
